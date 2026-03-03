@@ -68,7 +68,7 @@ Connected to MyWLC. Tracking client 3c6d.6606.0907...
 │  WLC:      MyWLC                                             │
 │  Client:   3c6d.6606.0907                                    │
 │  AP Name:  AP-9166-1             AP IP: 10.1.2.3             │
-│  SSID:     HomeNet               Protocol: 802.11ax - 5 GHz  │
+│  SSID:     DevNet                Protocol: 802.11ax - 5 GHz  │
 │  RSSI:     -42 dBm               SNR: 38 dB                  │
 │  State:    Run                   Updated: 14:23:05            │
 ╰──────────────────────────────────────────────────────────────╯
