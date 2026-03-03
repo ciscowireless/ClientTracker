@@ -32,7 +32,6 @@ ap:
   enable: "changeme"
 ```
 
-> **Note:** Keep `config.yaml` out of version control. Add it to `.gitignore` before committing.
 
 ## Usage
 
