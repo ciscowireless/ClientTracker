@@ -298,22 +298,36 @@ class APSessionPool:
     def _parse_dot11_clients(output: str, mac: str, ap_name: str) -> APClientState:
         """Parse ``show dot11 clients`` for a given MAC.
 
-        Expected columns:
-        MAC  AID  ?  Ch  SSID  RSSI  Rate  ...
+        Column layout (fixed prefix + variable-width SSID + fixed suffix):
+          MAC  SlotID  WLANID  AID  <SSID words...>  RSSI  Maxrate  is_wgb_wired  is_mld_sta
+
+        RSSI is always a negative integer in the range -1 to -128 dBm, used as
+        the right-hand anchor to extract the (potentially multi-word) SSID.
         """
         state = APClientState(mac=mac, ap_name=ap_name, timestamp=datetime.now())
         target = normalize_mac(mac)
         for line in output.splitlines():
             if target in normalize_mac(line):
                 tokens = line.split()
-                if len(tokens) >= 4:
-                    state.channel = tokens[3]
-                if len(tokens) >= 5:
-                    state.ssid = tokens[4]
-                if len(tokens) >= 6:
-                    state.rssi = tokens[5]
-                if len(tokens) >= 7:
-                    state.mcs_rate = tokens[6]
+                # Need at least: MAC SlotID WLANID AID <one SSID word> RSSI
+                if len(tokens) < 6:
+                    break
+                state.channel = tokens[3]
+                rssi_idx = next(
+                    (
+                        i for i in range(4, len(tokens))
+                        if tokens[i].startswith('-')
+                        and tokens[i][1:].isdigit()
+                        and 1 <= int(tokens[i][1:]) <= 128
+                    ),
+                    None,
+                )
+                if rssi_idx is None:
+                    break
+                state.ssid = " ".join(tokens[4:rssi_idx])
+                state.rssi = tokens[rssi_idx]
+                if rssi_idx + 1 < len(tokens):
+                    state.mcs_rate = tokens[rssi_idx + 1]
                 break
         return state
 
@@ -339,7 +353,7 @@ class APSessionPool:
 # ---------------------------------------------------------------------------
 
 class LiveDisplay:
-    PANEL_WIDTH = 80
+    PANEL_WIDTH = 110
 
     def __init__(self):
         self.console = Console()
@@ -369,7 +383,7 @@ class LiveDisplay:
     ) -> Panel:
         tbl = Table.grid(padding=(0, 2))
         tbl.add_column(min_width=10)
-        tbl.add_column(min_width=20)
+        tbl.add_column(min_width=26)
 
         if error:
             tbl.add_row("[red]Error[/red]", f"[red]{error}[/red]")
@@ -379,12 +393,12 @@ class LiveDisplay:
             ts = state.timestamp.strftime("%H:%M:%S") if state.timestamp else ""
             tbl.add_row("WLC:", hostname)
             tbl.add_row("Client:", state.mac)
-            tbl.add_row("AP Name:", f"{state.ap_name:<20s}  AP IP: {state.ap_ip}")
-            tbl.add_row("SSID:", f"{state.ssid:<20s}  Protocol: {state.protocol}")
+            tbl.add_row("AP Name:", f"{state.ap_name:<26s}  AP IP: {state.ap_ip}")
+            tbl.add_row("SSID:", f"{state.ssid:<26s}  Protocol: {state.protocol}")
             rssi_display = f"{state.rssi} dBm" if state.rssi else "N/A"
             snr_display = f"{state.snr} dB" if state.snr else "N/A"
-            tbl.add_row("RSSI:", f"{rssi_display:<20s}  SNR: {snr_display}")
-            tbl.add_row("State:", f"{state.state:<20s}  Updated: {ts}")
+            tbl.add_row("RSSI:", f"{rssi_display:<26s}  SNR: {snr_display}")
+            tbl.add_row("State:", f"{state.state:<26s}  Updated: {ts}")
 
         return Panel(tbl, title="WLC Client Stats", width=self.PANEL_WIDTH, border_style="yellow")
 
@@ -416,7 +430,7 @@ class LiveDisplay:
         else:
             tbl = Table.grid(padding=(0, 1))
             tbl.add_column(min_width=10)
-            tbl.add_column(min_width=30)
+            tbl.add_column(min_width=52)
             tbl.add_column(min_width=10)
             tbl.add_column(min_width=12)
             tbl.add_column(min_width=5, justify="right")
