@@ -25,6 +25,7 @@ wlc:
   host: "192.168.2.8"
   username: "admin"
   password: "changeme"
+  enable: "changeme"
 
 ap:
   username: "admin"
