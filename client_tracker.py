@@ -57,6 +57,7 @@ _CFG = _load_config()
 WLC_HOST = _CFG["wlc"]["host"]
 WLC_USERNAME = _CFG["wlc"]["username"]
 WLC_PASSWORD = _CFG["wlc"]["password"]
+WLC_ENABLE = _CFG["wlc"].get("enable", "")
 
 AP_USERNAME = _CFG["ap"]["username"]
 AP_PASSWORD = _CFG["ap"]["password"]
@@ -134,10 +135,11 @@ class RoamEvent:
 # ---------------------------------------------------------------------------
 
 class WLCSession:
-    def __init__(self, host: str, username: str, password: str):
+    def __init__(self, host: str, username: str, password: str, enable: str = ""):
         self.host = host
         self.username = username
         self.password = password
+        self.enable = enable
         self.connection: Optional[ConnectHandler] = None
         self.hostname: str = ""
         self._lock = threading.Lock()
@@ -148,7 +150,14 @@ class WLCSession:
             host=self.host,
             username=self.username,
             password=self.password,
+            secret=self.enable,
         )
+        if self.enable and not self.connection.check_enable_mode():
+            self.connection.enable()
+            if not self.connection.check_enable_mode():
+                raise RuntimeError(
+                    "WLC did not enter enable mode; check wlc.enable in config.yaml"
+                )
         self._fetch_hostname()
 
     def _fetch_hostname(self):
@@ -428,7 +437,7 @@ class LiveDisplay:
 class ClientTracker:
     def __init__(self, mac: str):
         self.mac = mac.lower()
-        self.wlc = WLCSession(WLC_HOST, WLC_USERNAME, WLC_PASSWORD)
+        self.wlc = WLCSession(WLC_HOST, WLC_USERNAME, WLC_PASSWORD, WLC_ENABLE)
         self.ap_pool = APSessionPool(AP_USERNAME, AP_PASSWORD, AP_ENABLE)
         self.display = LiveDisplay()
 
